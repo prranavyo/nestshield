@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@nestjs-modules/mailer": "^2.0.2",
+    "@nestjs-modules/mailer": "^1.8.1 ",
     "@nestjs/common": "^11.1.17",
     "@nestjs/platform-socket.io": "^11.1.16",
     "@nestjs/schedule": "^6.1.1",
