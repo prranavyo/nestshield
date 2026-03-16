@@ -14,18 +14,27 @@ import { NestShieldGuard } from './nestshield.guard';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT) || 5432,
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'root',
-      database: process.env.DB_NAME || 'nestshield',
+      // Railway injects DATABASE_URL automatically
+      // Falls back to individual vars for local development
+      ...(process.env.DATABASE_URL
+        ? {
+            url: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+          }
+        : {
+            host: process.env.DB_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT) || 5432,
+            username: process.env.DB_USERNAME || 'postgres',
+            password: process.env.DB_PASSWORD || 'root',
+            database: process.env.DB_NAME || 'nestshield',
+          }),
       entities: [Metric],
-      synchronize: true, // auto creates table
+      synchronize: true,
     }),
     TypeOrmModule.forFeature([Metric]),
     ThrottlerModule.forRoot([{
-      ttl: 60000,   // 60 seconds window
-      limit: 5,   // max 100 requests per window per IP
+      ttl: 60000,
+      limit: 100,
     }]),
   ],
   controllers: [AppController],
@@ -38,8 +47,8 @@ import { NestShieldGuard } from './nestshield.guard';
       useClass: MetricsInterceptor,
     },
     {
-      provide: APP_GUARD,       // ← was missing
-      useClass: NestShieldGuard, // ← was missing
+      provide: APP_GUARD,
+      useClass: NestShieldGuard,
     },
   ],
 })
