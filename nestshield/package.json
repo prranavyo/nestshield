@@ -4,11 +4,15 @@
   "description": "Real-time API monitoring for any backend — NestJS, Node, Python, Java, PHP, Go, Rust",
   "author": "Pranav",
   "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.15",
