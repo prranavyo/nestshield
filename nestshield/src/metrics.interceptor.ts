@@ -11,8 +11,6 @@ import { MetricsService } from './metrics.service';
 import { blockedIPsStore, totalRateLimited } from './nestshield.guard';
 import { metricsStore } from './metrics.store';
 
-
-
 function calcStats() {
   const total = metricsStore.length;
   if (total === 0) return null;
@@ -22,7 +20,7 @@ function calcStats() {
     metricsStore.reduce((s, e) => s + e.duration, 0) / total,
   );
 
-  // Group by route in memory — zero DB query
+  // Group by route
   const routeMap = new Map<string, any[]>();
   for (const e of metricsStore) {
     const key = e.method + '||' + e.route;
@@ -47,18 +45,20 @@ function calcStats() {
     };
   }).sort((a, b) => b.p95Ms - a.p95Ms);
 
-  // Hourly breakdown
+  // PERFORMANCE FIX: precompute timestamps once instead of inside each bucket filter
+  const now = Date.now();
+  const eventTimes = metricsStore.map(e => ({
+    t: new Date(e.timestamp).getTime(),
+    e,
+  }));
+
   const hourly = Array.from({ length: 12 }, (_, i) => {
-    const hour = new Date();
-    hour.setHours(hour.getHours() - (11 - i), 0, 0, 0);
-    const next = new Date(hour);
-    next.setHours(next.getHours() + 1);
+    const bucketStart = now - (11 - i + 1) * 3600000;
+    const bucketEnd = now - (11 - i) * 3600000;
+    const hour = new Date(bucketStart).getHours();
     return {
-      hour: hour.getHours(),
-      count: metricsStore.filter(e => {
-        const t = new Date(e.timestamp);
-        return t >= hour && t < next;
-      }).length,
+      hour,
+      count: eventTimes.filter(({ t }) => t >= bucketStart && t < bucketEnd).length,
     };
   });
 
@@ -67,14 +67,14 @@ function calcStats() {
       totalRequests: total,
       errorRate: ((errors / total) * 100).toFixed(1),
       avgLatency,
-      rateLimited: totalRateLimited,           
+      rateLimited: totalRateLimited,
       blockedIPs: blockedIPsStore.size,
     },
     routes,
     hourly,
     recent: metricsStore.slice(-50).reverse(),
-    blockedIPs: Array.from(blockedIPsStore.values())  // ← this
-    .sort((a, b) => b.hits - a.hits),
+    blockedIPs: Array.from(blockedIPsStore.values())
+      .sort((a, b) => b.hits - a.hits),
   };
 }
 
@@ -93,7 +93,6 @@ export class MetricsInterceptor implements NestInterceptor {
     const route = request.url;
     const startTime = Date.now();
 
-    // Skip nestshield's own routes
     if (route.startsWith('/nestshield')) {
       return next.handle();
     }
@@ -111,21 +110,17 @@ export class MetricsInterceptor implements NestInterceptor {
           timestamp: new Date().toISOString(),
         };
 
-        // Save to memory
         metricsStore.push(event);
         if (metricsStore.length > 500) metricsStore.shift();
 
-        // Save to PostgreSQL fire and forget
+        // Save to PostgreSQL — fire and forget
         this.metricsService.save(event).catch(() => null);
 
-        // Calculate stats from memory and push WITH the WebSocket event
-        // Zero DB query — instant
+        // Push full stats via WebSocket — zero DB query
         const stats = calcStats();
         if (stats) {
           this.gateway.sendUpdate(stats);
         }
-
-        console.log(`[NestShield] ${method} ${route} ${statusCode} ${duration}ms`);
       }),
     );
   }
