@@ -5,7 +5,7 @@ import { metricsStore } from './metrics.store';
 import { blockedIPsStore } from './nestshield.guard';
 
 const alertCooldowns = new Map<string, number>();
-const COOLDOWN_MS = 10 * 60 * 1000;
+const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
 
 function isOnCooldown(key: string): boolean {
   const last = alertCooldowns.get(key);
@@ -25,13 +25,20 @@ export class AlertService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async checkAlerts() {
-    const events = metricsStore;
-    if (events.length === 0) return;
+    if (metricsStore.length === 0) return;
 
-    const since = Date.now() - 5 * 60 * 1000;
-    const recent = events.filter(
-      e => new Date(e.timestamp).getTime() > since
-    );
+    // PERFORMANCE FIX: precompute cutoff times once
+    const now = Date.now();
+    const fiveMinAgo = now - 5 * 60 * 1000;
+    const twoMinAgo = now - 2 * 60 * 1000;
+
+    // PERFORMANCE FIX: precompute timestamps once, not inside every filter
+    const withTimes = metricsStore.map(e => ({
+      ...e,
+      t: new Date(e.timestamp).getTime(),
+    }));
+
+    const recent = withTimes.filter(e => e.t > fiveMinAgo);
     if (recent.length === 0) return;
 
     const total = recent.length;
@@ -62,26 +69,23 @@ export class AlertService {
       });
     }
 
-    // Rule 3 — API down
-    const twoMinsAgo = Date.now() - 2 * 60 * 1000;
-    const veryRecent = events.filter(
-      e => new Date(e.timestamp).getTime() > twoMinsAgo
-    );
+    // Rule 3 — API down (no requests in last 2 minutes)
+    const veryRecent = withTimes.filter(e => e.t > twoMinAgo);
     if (
       veryRecent.length === 0 &&
-      events.length > 10 &&
+      metricsStore.length > 10 &&
       !isOnCooldown('api-down')
     ) {
       setCooldown('api-down');
       await this.sendAlert({
         subject: '🔴 [NestShield] API may be down',
         level: 'CRITICAL',
-        message: 'No requests in the last 2 minutes',
+        message: 'No requests received in the last 2 minutes',
         details: 'Check your server immediately.',
       });
     }
 
-    // Rule 4 — attack detected
+    // Rule 4 — attack detected (> 5 IPs blocked)
     if (blockedIPsStore.size > 5 && !isOnCooldown('attack')) {
       setCooldown('attack');
       const ips = Array.from(blockedIPsStore.values())
@@ -96,7 +100,7 @@ export class AlertService {
       });
     }
 
-    // Rule 5 — recovery
+    // Rule 5 — recovery (error rate back to normal)
     if (
       errorRate < 1 &&
       alertCooldowns.has('error-rate') &&
@@ -124,7 +128,7 @@ export class AlertService {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .map(([route, count]) => `  → ${route} — ${count} errors`)
-      .join('\n');
+      .join('\n') || 'No error details available.';
   }
 
   async sendAlert(data: {
