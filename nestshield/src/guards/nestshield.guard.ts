@@ -27,7 +27,18 @@ export class NestShieldGuard extends ThrottlerGuard {
     throttlerLimitDetail: ThrottlerLimitDetail,
   ): Promise<void> {
     const request = context.switchToHttp().getRequest();
-    const ip = request.headers['x-forwarded-for'] || request.ip || 'unknown';
+
+    // x-forwarded-for can be a comma-separated list of IPs (client, proxy1, proxy2…)
+    // Always use the first entry — that's the real client IP.
+    const forwardedFor = request.headers['x-forwarded-for'];
+    const rawIp =
+      forwardedFor
+        ? (Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor)
+            .split(',')[0]
+            .trim()
+        : request.ip || 'unknown';
+
+    const ip = rawIp || 'unknown';
     const now = new Date().toISOString();
 
     if (blockedIPsStore.has(ip)) {

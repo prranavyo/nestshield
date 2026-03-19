@@ -332,7 +332,7 @@ body::after{
 .DELETE{background:rgba(239,68,68,0.12); color:var(--red);   border:1px solid rgba(239,68,68,0.25)}
 
 /* Health pills */
-.pill{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px}
+.pill{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
 .p-ok  {background:rgba(16,185,129,0.1); color:var(--green);border:1px solid rgba(16,185,129,0.2)}
 .p-warn{background:rgba(245,158,11,0.1); color:var(--amber);border:1px solid rgba(245,158,11,0.2)}
 .p-crit{background:rgba(239,68,68,0.1);  color:var(--red);  border:1px solid rgba(239,68,68,0.2)}
@@ -1088,7 +1088,7 @@ function render(d) {
       '<td style="color:var(--red)">'+b.ip+'</td>'+
       '<td style="color:var(--red)">'+b.hits+'</td>'+
       '<td>'+new Date(b.lastSeen).toLocaleTimeString()+'</td>'+
-      '<td><span class="pill p-crit">blocked</span></td>'+
+      '<td><span class="pill p-crit" style="white-space:nowrap">blocked</span></td>'+
     '</tr>').join('');
 }
 </script>
