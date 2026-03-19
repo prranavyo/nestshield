@@ -1,0 +1,24 @@
+# Source files — only dist/ is published
+src/
+
+# Test files
+test/
+**/*.spec.ts
+**/*.test.ts
+
+# Config files
+.env
+.env.*
+.eslintrc*
+.prettierrc*
+nest-cli.json
+tsconfig*.json
+
+# Git
+.git/
+.gitignore
+
+# Misc
+node_modules/
+*.log
+.DS_Store

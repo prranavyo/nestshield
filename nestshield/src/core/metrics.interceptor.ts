@@ -18,13 +18,13 @@ export class MetricsInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const req        = context.switchToHttp().getRequest();
-    const res        = context.switchToHttp().getResponse();
-    const method     = req.method;
-    const route      = req.url;
-    const start      = Date.now();
+    const req    = context.switchToHttp().getRequest();
+    const res    = context.switchToHttp().getResponse();
+    const method = req.method;
+    const route  = req.url;
+    const start  = Date.now();
 
-    // Capture controller + handler name for richer error context
+    // Capture controller + handler name for richer error context in emails
     const controllerName = context.getClass()?.name || 'Unknown';
     const handlerName    = context.getHandler()?.name || 'unknown';
 
@@ -59,21 +59,16 @@ export class MetricsInterceptor implements NestInterceptor {
     };
 
     return next.handle().pipe(
-      // Success
       tap(() => pushEvent(res.statusCode)),
-
-      // Exception — captures actual error message
       catchError((err) => {
-        const statusCode    = err?.status || err?.statusCode || 500;
-        const errorMessage  =
-          // NestJS HttpException message
+        const statusCode   = err?.status || err?.statusCode || 500;
+        const errorMessage =
           (typeof err?.response === 'string' ? err.response : null) ||
           err?.response?.message ||
           err?.message ||
           'Internal server error';
-
         pushEvent(statusCode, String(errorMessage));
-        return throwError(() => err); // re-throw so NestJS handles it normally
+        return throwError(() => err);
       }),
     );
   }
