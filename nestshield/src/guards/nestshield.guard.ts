@@ -1,6 +1,6 @@
 import { Injectable, ExecutionContext } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler';
-import { metricsStore } from './metrics.store';
+import { metricsStore } from '../core/metrics.store';
 
 export interface BlockedIP {
   ip: string;
@@ -18,9 +18,7 @@ export class NestShieldGuard extends ThrottlerGuard {
   protected async shouldSkip(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const route = request.url || '';
-    if (route.startsWith('/nestshield')) {
-      return true;
-    }
+    if (route.startsWith('/nestshield')) return true;
     return false;
   }
 
@@ -29,11 +27,7 @@ export class NestShieldGuard extends ThrottlerGuard {
     throttlerLimitDetail: ThrottlerLimitDetail,
   ): Promise<void> {
     const request = context.switchToHttp().getRequest();
-    const ip =
-      request.headers['x-forwarded-for'] ||
-      request.ip ||
-      'unknown';
-
+    const ip = request.headers['x-forwarded-for'] || request.ip || 'unknown';
     const now = new Date().toISOString();
 
     if (blockedIPsStore.has(ip)) {
@@ -41,12 +35,7 @@ export class NestShieldGuard extends ThrottlerGuard {
       existing.hits++;
       existing.lastSeen = now;
     } else {
-      blockedIPsStore.set(ip, {
-        ip,
-        hits: 1,
-        firstSeen: now,
-        lastSeen: now,
-      });
+      blockedIPsStore.set(ip, { ip, hits: 1, firstSeen: now, lastSeen: now });
     }
 
     totalRateLimited++;
@@ -58,7 +47,7 @@ export class NestShieldGuard extends ThrottlerGuard {
       duration: 0,
       timestamp: now,
     });
-    if (metricsStore.length > 500) metricsStore.shift();
+    if (metricsStore.length > 1000) metricsStore.shift();
 
     return super.throwThrottlingException(context, throttlerLimitDetail);
   }

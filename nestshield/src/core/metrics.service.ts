@@ -1,14 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { metricsStore } from './metrics.store';
-import { blockedIPsStore, totalRateLimited } from './nestshield.guard';
-
-// ─── Pure in-memory stats ─────────────────────────────────────────────────────
-// No DB queries. All data from metricsStore. Zero lag, zero reconnecting.
+import { blockedIPsStore, totalRateLimited } from '../guards/nestshield.guard';
 
 @Injectable()
 export class MetricsService {
 
-  // No-op: kept for interface compatibility only
+  // No-op: kept for interface compatibility
   async save(_data: any) {}
 
   getStatsSync(hours: number = 1): any {
