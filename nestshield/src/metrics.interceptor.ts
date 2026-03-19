@@ -4,79 +4,11 @@ import {
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { tap, catchError } from 'rxjs/operators';
 import { MetricsGateway } from './metrics.gateway';
 import { MetricsService } from './metrics.service';
-import { blockedIPsStore, totalRateLimited } from './nestshield.guard';
 import { metricsStore } from './metrics.store';
-
-function calcStats() {
-  const total = metricsStore.length;
-  if (total === 0) return null;
-
-  const errors = metricsStore.filter(e => e.statusCode >= 400).length;
-  const avgLatency = Math.round(
-    metricsStore.reduce((s, e) => s + e.duration, 0) / total,
-  );
-
-  // Group by route
-  const routeMap = new Map<string, any[]>();
-  for (const e of metricsStore) {
-    const key = e.method + '||' + e.route;
-    if (!routeMap.has(key)) routeMap.set(key, []);
-    routeMap.get(key)!.push(e);
-  }
-
-  const routes = Array.from(routeMap.entries()).map(([key, group]) => {
-    const [method, route] = key.split('||');
-    const sorted = [...group].sort((a, b) => a.duration - b.duration);
-    const p95idx = Math.floor(sorted.length * 0.95);
-    const p99idx = Math.floor(sorted.length * 0.99);
-    return {
-      method,
-      route,
-      count: group.length,
-      avgMs: Math.round(group.reduce((s, e) => s + e.duration, 0) / group.length),
-      p95Ms: sorted[p95idx]?.duration ?? sorted[sorted.length - 1]?.duration ?? 0,
-      p99Ms: sorted[p99idx]?.duration ?? sorted[sorted.length - 1]?.duration ?? 0,
-      errorCount: group.filter(e => e.statusCode >= 400).length,
-      lastStatus: group[group.length - 1].statusCode,
-    };
-  }).sort((a, b) => b.p95Ms - a.p95Ms);
-
-  // PERFORMANCE FIX: precompute timestamps once instead of inside each bucket filter
-  const now = Date.now();
-  const eventTimes = metricsStore.map(e => ({
-    t: new Date(e.timestamp).getTime(),
-    e,
-  }));
-
-  const hourly = Array.from({ length: 12 }, (_, i) => {
-    const bucketStart = now - (11 - i + 1) * 3600000;
-    const bucketEnd = now - (11 - i) * 3600000;
-    const hour = new Date(bucketStart).getHours();
-    return {
-      hour,
-      count: eventTimes.filter(({ t }) => t >= bucketStart && t < bucketEnd).length,
-    };
-  });
-
-  return {
-    summary: {
-      totalRequests: total,
-      errorRate: ((errors / total) * 100).toFixed(1),
-      avgLatency,
-      rateLimited: totalRateLimited,
-      blockedIPs: blockedIPsStore.size,
-    },
-    routes,
-    hourly,
-    recent: metricsStore.slice(-50).reverse(),
-    blockedIPs: Array.from(blockedIPsStore.values())
-      .sort((a, b) => b.hits - a.hits),
-  };
-}
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
@@ -86,41 +18,62 @@ export class MetricsInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
+    const req        = context.switchToHttp().getRequest();
+    const res        = context.switchToHttp().getResponse();
+    const method     = req.method;
+    const route      = req.url;
+    const start      = Date.now();
 
-    const method = request.method;
-    const route = request.url;
-    const startTime = Date.now();
+    // Capture controller + handler name for richer error context
+    const controllerName = context.getClass()?.name || 'Unknown';
+    const handlerName    = context.getHandler()?.name || 'unknown';
 
-    if (route.startsWith('/nestshield')) {
-      return next.handle();
-    }
+    if (route.startsWith('/nestshield')) return next.handle();
+
+    const pushEvent = (statusCode: number, errorMessage?: string) => {
+      const event: any = {
+        method,
+        route,
+        statusCode,
+        duration:       Date.now() - start,
+        timestamp:      new Date().toISOString(),
+        controllerName,
+        handlerName,
+      };
+
+      if (statusCode >= 400 && errorMessage) {
+        event.errorMessage = errorMessage;
+        event.errorType    = statusCode >= 500 ? 'Server Error'
+                           : statusCode === 429 ? 'Too Many Requests'
+                           : statusCode === 404 ? 'Not Found'
+                           : statusCode === 401 ? 'Unauthorized'
+                           : statusCode === 403 ? 'Forbidden'
+                           : 'Client Error';
+      }
+
+      metricsStore.push(event);
+      if (metricsStore.length > 1000) metricsStore.shift();
+
+      const stats = this.metricsService.getStatsSync();
+      this.gateway.sendUpdate(stats);
+    };
 
     return next.handle().pipe(
-      tap(() => {
-        const duration = Date.now() - startTime;
-        const statusCode = response.statusCode;
+      // Success
+      tap(() => pushEvent(res.statusCode)),
 
-        const event = {
-          method,
-          route,
-          statusCode,
-          duration,
-          timestamp: new Date().toISOString(),
-        };
+      // Exception — captures actual error message
+      catchError((err) => {
+        const statusCode    = err?.status || err?.statusCode || 500;
+        const errorMessage  =
+          // NestJS HttpException message
+          (typeof err?.response === 'string' ? err.response : null) ||
+          err?.response?.message ||
+          err?.message ||
+          'Internal server error';
 
-        metricsStore.push(event);
-        if (metricsStore.length > 500) metricsStore.shift();
-
-        // Save to PostgreSQL — fire and forget
-        this.metricsService.save(event).catch(() => null);
-
-        // Push full stats via WebSocket — zero DB query
-        const stats = calcStats();
-        if (stats) {
-          this.gateway.sendUpdate(stats);
-        }
+        pushEvent(statusCode, String(errorMessage));
+        return throwError(() => err); // re-throw so NestJS handles it normally
       }),
     );
   }
