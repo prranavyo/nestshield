@@ -10,6 +10,5 @@ async function bootstrap() {
 
   console.log(`\n⚡ NestShield running on http://localhost:${port}`);
   console.log(`📊 Dashboard  → http://localhost:${port}/nestshield/ui`);
-  console.log(`📈 Stats API  → http://localhost:${port}/nestshield/stats\n`);
 }
 bootstrap();
