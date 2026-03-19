@@ -266,7 +266,7 @@ body::after{
 /* ═══ LAYOUT ═══ */
 .row2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px;align-items:start}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
-.row4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+.row4{display:grid;grid-template-columns:1fr 1fr 1fr 1.6fr;gap:14px;margin-bottom:14px}
 
 /* ═══ CARD ═══ */
 .card{
@@ -762,10 +762,12 @@ body::after{
       <div class="card-title"><div class="cdot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>Blocked IPs</div>
       <div class="card-sub" id="bl-cnt"></div>
     </div>
-    <table class="tbl">
-      <thead><tr><th>IP</th><th>Hits</th><th>Last Seen</th><th>Status</th></tr></thead>
-      <tbody id="bl-body"></tbody>
-    </table>
+    <div style="overflow-x:auto;width:100%">
+      <table class="tbl" style="min-width:340px">
+        <thead><tr><th>IP</th><th>Hits</th><th>Last Seen</th><th>Status</th></tr></thead>
+        <tbody id="bl-body"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -1085,10 +1087,10 @@ function render(d) {
   document.getElementById('bl-body').innerHTML=bl.length===0
     ?'<tr><td colspan="4" class="empty">No IPs blocked ✓</td></tr>'
     :bl.map(b=>'<tr>'+
-      '<td style="color:var(--red)">'+b.ip+'</td>'+
+      '<td style="color:var(--red);white-space:nowrap">'+b.ip+'</td>'+
       '<td style="color:var(--red)">'+b.hits+'</td>'+
-      '<td>'+new Date(b.lastSeen).toLocaleTimeString()+'</td>'+
-      '<td><span class="pill p-crit" style="white-space:nowrap">blocked</span></td>'+
+      '<td style="white-space:nowrap">'+new Date(b.lastSeen).toLocaleTimeString()+'</td>'+
+      '<td style="white-space:nowrap"><span class="pill p-crit">blocked</span></td>'+
     '</tr>').join('');
 }
 </script>
