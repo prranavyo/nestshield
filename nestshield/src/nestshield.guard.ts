@@ -51,7 +51,6 @@ export class NestShieldGuard extends ThrottlerGuard {
 
     totalRateLimited++;
 
-    // FIX: push 429 event to metricsStore so dashboard tracks rate limited requests
     metricsStore.push({
       method: request.method,
       route: request.url,
