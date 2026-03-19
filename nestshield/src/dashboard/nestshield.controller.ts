@@ -4,8 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MetricsService } from '../core/metrics.service';
 import { AlertService } from '../alerts/alert.service';
-import { metricsStore } from '../core/metrics.store';
-import { blockedIPsStore } from '../guards/nestshield.guard';
+
 
 @Controller()
 export class NestShieldController {
