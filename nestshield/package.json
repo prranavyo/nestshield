@@ -1,16 +1,16 @@
 {
   "name": "nestshield",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Real-time API monitoring, email alerts, and rate limiting for NestJS — zero database, zero infrastructure.",
   "author": "Pranav Deekshith <pranav.d.karanam@gmail.com>",
   "license": "MIT",
   "homepage": "https://nestshield.dev",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/nestshield.git"
+    "url": "https://github.com/prranavyo/nestshield.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/nestshield/issues"
+    "url": "https://github.com/prranavyo/nestshield/issues"
   },
   "keywords": [
     "nestjs",
@@ -27,10 +27,19 @@
     "email-alerts",
     "api-guard"
   ],
-  "main": "dist/nestshield/index.js",
-  "types": "dist/nestshield/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
-    "dist/nestshield/**/*",
+    "dist/alerts/**/*",
+    "dist/core/**/*",
+    "dist/dashboard/**/*",
+    "dist/guards/**/*",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/index.js.map",
+    "dist/nestshield.module.js",
+    "dist/nestshield.module.d.ts",
+    "dist/nestshield.module.js.map",
     "README.md",
     "LICENSE"
   ],
@@ -43,32 +52,44 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
-    "@nestjs/platform-express": "^10.0.0",
-    "@nestjs/platform-socket.io": "^10.0.0",
-    "@nestjs/schedule": "^4.0.0",
-    "@nestjs/throttler": "^6.0.0",
-    "@nestjs/websockets": "^10.0.0",
-    "@nestjs/config": "^3.0.0",
-    "nodemailer": "^6.9.0",
-    "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0",
+    "nodemailer": "^8.0.0",
     "socket.io": "^4.6.0"
   },
   "devDependencies": {
-    "@nestjs/cli": "^10.0.0",
-    "@nestjs/schematics": "^10.0.0",
-    "@nestjs/testing": "^10.0.0",
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@nestjs/testing": "^11.0.0",
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.0.0",
+    "@nestjs/schedule": "^6.0.0",
+    "@nestjs/throttler": "^6.0.0",
+    "@nestjs/websockets": "^11.0.0",
     "@types/node": "^20.0.0",
     "@types/nodemailer": "^6.4.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.0",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
-    "reflect-metadata": "^0.1.13",
-    "rxjs": "^7.8.0"
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
+    "@nestjs/platform-express": "^10.0.0 || ^11.0.0",
+    "@nestjs/platform-socket.io": "^10.0.0 || ^11.0.0",
+    "@nestjs/schedule": "^4.0.0 || ^5.0.0 || ^6.0.0",
+    "@nestjs/throttler": "^5.0.0 || ^6.0.0",
+    "@nestjs/websockets": "^10.0.0 || ^11.0.0",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
+    "rxjs": "^7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/schedule": {
+      "optional": false
+    },
+    "@nestjs/throttler": {
+      "optional": false
+    }
   },
   "engines": {
     "node": ">=18.0.0",

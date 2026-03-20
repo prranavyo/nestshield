@@ -1,7 +1,6 @@
 import { Module, DynamicModule, Global } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
-
 import { MetricsGateway }       from './core/metrics.gateway';
 import { MetricsService }       from './core/metrics.service';
 import { MetricsInterceptor }   from './core/metrics.interceptor';
