@@ -10,6 +10,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     NestShieldModule.forRoot({   
+      dashboardSecret: '878dad8d9dc6b83aa157d726fdf9cc573a4d28e8114a496b38a1172d41e2f945',
       throttle: {
         ttl:   60000,
         limit: 100,

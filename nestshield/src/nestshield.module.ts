@@ -1,12 +1,14 @@
 import { Module, DynamicModule, Global } from '@nestjs/common';
-import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { MetricsGateway }       from './core/metrics.gateway';
-import { MetricsService }       from './core/metrics.service';
-import { MetricsInterceptor }   from './core/metrics.interceptor';
-import { NestShieldGuard }      from './guards/nestshield.guard';
-import { AlertService }         from './alerts/alert.service';
-import { NestShieldController } from './dashboard/nestshield.controller';
+import { APP_INTERCEPTOR, APP_GUARD }    from '@nestjs/core';
+import { ThrottlerModule }               from '@nestjs/throttler';
+import { MetricsGateway }                from './core/metrics.gateway';
+import { MetricsService }                from './core/metrics.service';
+import { MetricsInterceptor }            from './core/metrics.interceptor';
+import { NestShieldGuard }               from './guards/nestshield.guard';
+import { AlertService }                  from './alerts/alert.service';
+import { NestShieldController }          from './dashboard/nestshield.controller';
+import { DashboardAuthService }          from './dashboard/dashboard-auth.service';
+import { DashboardAuthGuard }            from './dashboard/dashboard-auth.guard';
 
 export interface NestShieldAlertOptions {
   /** Your email — alerts will be sent here from NestShield */
@@ -29,34 +31,67 @@ export interface NestShieldThrottleOptions {
 export interface NestShieldOptions {
   throttle?: NestShieldThrottleOptions;
   alerts?: NestShieldAlertOptions;
+  /**
+   * Secret key to protect the /nestshield/ui dashboard.
+   *
+   * The developer enters this on the login page.
+   * Minimum 16 characters. Generate a safe one with:
+   *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   *
+   * If omitted, dashboard is UNPROTECTED — development only.
+   */
+  dashboardSecret?: string;
 }
 
 @Global()
 @Module({})
 export class NestShieldModule {
   static forRoot(options: NestShieldOptions = {}): DynamicModule {
-    const throttleTtl   = options.throttle?.ttl   ?? 60000;
-    const throttleLimit = options.throttle?.limit  ?? 100;
+    const throttleTtl     = options.throttle?.ttl   ?? 60000;
+    const throttleLimit   = options.throttle?.limit  ?? 100;
+    const dashboardSecret = options.dashboardSecret  ?? '';
+
+    if (!dashboardSecret) {
+      console.warn(
+        '\n[NestShield] WARNING: dashboardSecret is not set.' +
+        '\n             /nestshield/ui is publicly accessible.' +
+        '\n             Set dashboardSecret in forRoot() for production.\n',
+      );
+    }
 
     return {
-      global: true,
-      module: NestShieldModule,
-      imports: [
+      global      : true,
+      module      : NestShieldModule,
+      imports     : [
         ThrottlerModule.forRoot([{ ttl: throttleTtl, limit: throttleLimit }]),
       ],
-      controllers: [NestShieldController],
-      providers: [
+      controllers : [NestShieldController],
+      providers   : [
         MetricsGateway,
         MetricsService,
-        // ── Pass options directly via factory — no token injection needed ──
+
+        // Alert service — pass full options
         {
-          provide:    AlertService,
-          useFactory: () => new AlertService(options),
+          provide    : AlertService,
+          useFactory : () => new AlertService(options),
         },
+
+        // DashboardAuthService — secret injected directly from options, zero DB
+        {
+          provide    : DashboardAuthService,
+          useFactory : () => new DashboardAuthService(
+            dashboardSecret || 'dev-only-insecure-placeholder',
+          ),
+        },
+
+        // DashboardAuthGuard — protects /nestshield/* routes
+        DashboardAuthGuard,
+
+        // Global interceptor + throttle guard
         { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },
         { provide: APP_GUARD,       useClass: NestShieldGuard    },
       ],
-      exports: [MetricsService, AlertService],
+      exports : [MetricsService, AlertService, DashboardAuthService],
     };
   }
 }

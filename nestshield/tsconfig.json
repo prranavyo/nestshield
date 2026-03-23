@@ -10,6 +10,12 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    "paths": {
+      "@nestjs/common": ["./node_modules/@nestjs/common"],
+      "@nestjs/core":   ["./node_modules/@nestjs/core"],
+      "@nestjs/websockets": ["./node_modules/@nestjs/websockets"],
+      "@nestjs/platform-express": ["./node_modules/@nestjs/platform-express"]
+    },
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,

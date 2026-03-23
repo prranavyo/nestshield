@@ -7,6 +7,8 @@
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.16",
+    "@types/cookie-parser": "^1.4.10",
+    "cookie-parser": "^1.4.7",
     "nodemailer": "^8.0.2",
     "socket.io": "^4.8.3",
     "typeorm": "^0.3.28"
