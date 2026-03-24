@@ -17,7 +17,7 @@ import { DashboardAuthService } from './dashboard-auth.service';
 import { DashboardAuthGuard }   from './dashboard-auth.guard';
 
 @Controller()
-/*@UseGuards(DashboardAuthGuard)*/
+@UseGuards(DashboardAuthGuard)
 export class NestShieldController {
   constructor(
     private readonly metricsService : MetricsService,
