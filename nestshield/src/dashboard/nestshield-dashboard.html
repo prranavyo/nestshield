@@ -1,0 +1,1059 @@
+`<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NestShield — API Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   TOKENS — DARK
+═══════════════════════════════════════ */
+:root,[data-theme="dark"]{
+  --bg:       #0a0a0f;
+  --surface:  #111118;
+  --surface2: #18181f;
+  --surface3: #1e1e28;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --text:     #f1f1f5;
+  --text2:    #9090a8;
+  --text3:    #4a4a62;
+  --accent:   #6366f1;
+  --accent2:  #818cf8;
+  --green:    #10b981;
+  --amber:    #f59e0b;
+  --red:      #ef4444;
+  --sky:      #38bdf8;
+  --purple:   #a78bfa;
+  --glow-a:   rgba(99,102,241,0.2);
+  --glow-g:   rgba(16,185,129,0.15);
+  --glow-r:   rgba(239,68,68,0.2);
+  --noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* ═══════════════════════════════════════
+   TOKENS — LIGHT
+═══════════════════════════════════════ */
+[data-theme="light"]{
+  --bg:       #f4f4f8;
+  --surface:  #ffffff;
+  --surface2: #f8f8fc;
+  --surface3: #efeff5;
+  --border:   rgba(0,0,0,0.08);
+  --border2:  rgba(0,0,0,0.14);
+  --text:     #111118;
+  --text2:    #52526e;
+  --text3:    #a8a8c0;
+  --accent:   #4f46e5;
+  --accent2:  #6366f1;
+  --green:    #059669;
+  --amber:    #d97706;
+  --red:      #dc2626;
+  --sky:      #0284c7;
+  --purple:   #7c3aed;
+  --glow-a:   rgba(79,70,229,0.08);
+  --glow-g:   rgba(5,150,105,0.08);
+  --glow-r:   rgba(220,38,38,0.08);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+body{
+  font-family:'Inter',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  transition:background .35s,color .35s;
+}
+
+/* Mesh background — dark only */
+[data-theme="dark"] body::before{
+  content:'';position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 20% 10%, rgba(99,102,241,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(16,185,129,0.05) 0%, transparent 60%);
+  pointer-events:none;z-index:0;
+}
+
+/* Dot grid */
+body::after{
+  content:'';position:fixed;inset:0;
+  background-image:radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size:28px 28px;
+  pointer-events:none;z-index:0;
+  opacity:0.6;
+}
+
+.wrap{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:20px 24px}
+
+/* ═══ TOPBAR ═══ */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 0 18px;margin-bottom:20px;
+  border-bottom:1px solid var(--border);
+}
+
+/* Logo */
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit}
+.logo-mark{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 1px rgba(99,102,241,0.4), 0 4px 14px rgba(99,102,241,0.3);
+  position:relative;overflow:hidden;flex-shrink:0;
+  animation:logoPulse 4s ease-in-out infinite;
+}
+.logo-mark::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,0.15),transparent);
+}
+@keyframes logoPulse{
+  0%,100%{box-shadow:0 0 0 1px rgba(99,102,241,0.4),0 4px 14px rgba(99,102,241,0.3)}
+  50%    {box-shadow:0 0 0 1px rgba(99,102,241,0.6),0 4px 22px rgba(99,102,241,0.5)}
+}
+/* SVG shield inside logo */
+.logo-svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;position:relative;z-index:1}
+
+.logo-text .name{font-size:17px;font-weight:700;letter-spacing:-0.4px;color:var(--text);line-height:1}
+.logo-text .tag{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:0.12em;text-transform:uppercase;margin-top:2px}
+
+/* Nav right */
+.nav-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.live-pill{
+  display:flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);
+  background:var(--glow-g);border:1px solid rgba(16,185,129,0.25);
+  padding:5px 12px;border-radius:20px;letter-spacing:0.06em;
+}
+.live-ring{
+  width:8px;height:8px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 0 0 rgba(16,185,129,0.5);
+  animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;
+}
+@keyframes ping{
+  0%   {box-shadow:0 0 0 0 rgba(16,185,129,0.6)}
+  70%  {box-shadow:0 0 0 7px rgba(16,185,129,0)}
+  100% {box-shadow:0 0 0 0 rgba(16,185,129,0)}
+}
+
+/* Theme toggle */
+.theme-btn{
+  display:flex;align-items:center;gap:7px;
+  padding:6px 14px;border-radius:8px;
+  border:1px solid var(--border2);background:var(--surface2);
+  color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:10px;
+  cursor:pointer;transition:all .2s;letter-spacing:0.06em;user-select:none;
+}
+.theme-btn:hover{background:var(--surface3);border-color:var(--accent);color:var(--text)}
+.theme-icon{font-size:13px;transition:transform .4s}
+[data-theme="light"] .theme-icon{transform:rotate(180deg)}
+
+/* Time filters — animated */
+.tf-group{
+  display:flex;gap:3px;
+  padding:3px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;
+  position:relative;
+}
+/* Sliding pill indicator */
+.tf-slider{
+  position:absolute;top:3px;height:calc(100% - 6px);
+  background:var(--accent);border-radius:6px;
+  transition:left .25s cubic-bezier(.34,1.56,.64,1), width .25s cubic-bezier(.34,1.56,.64,1);
+  box-shadow:0 2px 8px var(--glow-a);
+  z-index:0;
+}
+.tf{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  padding:5px 13px;border-radius:6px;border:none;
+  background:transparent;color:var(--text3);cursor:pointer;
+  transition:color .15s;
+  position:relative;z-index:1;
+}
+.tf:hover{color:var(--text)}
+.tf.on{color:#fff;font-weight:600}
+
+/* ═══ STATUS BAR ═══ */
+.statusbar{
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:20px;
+}
+.statusbar .sep{color:var(--border2)}
+.statusbar .hi{color:var(--accent2)}
+
+/* ═══ STAT CARDS ═══ */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+
+.kpi{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;padding:18px 20px 15px;
+  position:relative;overflow:hidden;
+  transition:border-color .25s,transform .2s,box-shadow .25s;
+  animation:slideUp .45s ease both;
+}
+.kpi:hover{border-color:var(--border2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.12)}
+
+@keyframes slideUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+.kpi:nth-child(1){animation-delay:.05s}.kpi:nth-child(2){animation-delay:.09s}
+.kpi:nth-child(3){animation-delay:.13s}.kpi:nth-child(4){animation-delay:.17s}
+.kpi:nth-child(5){animation-delay:.21s}
+
+/* Top accent line */
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:14px 14px 0 0}
+.kpi.k-a::before{background:linear-gradient(90deg,var(--accent),transparent)}
+.kpi.k-g::before{background:linear-gradient(90deg,var(--green),transparent)}
+.kpi.k-o::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.kpi.k-r::before{background:linear-gradient(90deg,var(--red),transparent)}
+.kpi.k-s::before{background:linear-gradient(90deg,var(--sky),transparent)}
+
+/* Shimmer on hover */
+.kpi::after{
+  content:'';position:absolute;top:0;left:-100%;
+  width:50%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.03),transparent);
+  transition:left .5s;
+}
+.kpi:hover::after{left:150%}
+
+.kpi-label{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:600;color:var(--text);line-height:1;counter-reset:none}
+.kpi-val .u{font-size:13px;font-weight:400;color:var(--text3);margin-left:1px}
+.kpi-hint{font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:8px;color:var(--text3)}
+
+/* ═══ LAYOUT ═══ */
+.row2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:14px;align-items:start}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px}
+.row4{display:grid;grid-template-columns:1fr 1fr 1fr 1.6fr;gap:14px;margin-bottom:14px}
+
+/* ═══ CARD ═══ */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden;
+  animation:slideUp .5s ease both;animation-delay:.2s;
+}
+.card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 18px;border-bottom:1px solid var(--border);
+  background:var(--surface2);
+}
+.card-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--text2);
+}
+.cdot{width:6px;height:6px;border-radius:50%}
+.card-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)}
+
+/* ═══ CHART ═══ */
+.chart-body{padding:14px 18px}
+.bars{display:flex;align-items:flex-end;gap:4px;height:60px;margin-bottom:6px}
+.bar{
+  flex:1;border-radius:3px 3px 0 0;cursor:pointer;
+  background:rgba(99,102,241,0.12);
+  border-top:1px solid rgba(99,102,241,0.25);
+  transition:background .2s,border-color .2s;
+  position:relative;
+}
+[data-theme="light"] .bar{background:rgba(79,70,229,0.07);border-top-color:rgba(79,70,229,0.2)}
+.bar:hover{background:rgba(99,102,241,0.3)!important;border-top-color:var(--accent)!important}
+.bar-tooltip{
+  display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);
+  background:var(--surface3);border:1px solid var(--border2);color:var(--text);
+  font-family:'JetBrains Mono',monospace;font-size:10px;padding:4px 8px;border-radius:5px;
+  white-space:nowrap;pointer-events:none;z-index:10;
+}
+.bar:hover .bar-tooltip{display:block}
+.blabels{display:flex}
+.blabel{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);flex:1;text-align:center}
+
+/* ═══ TABLES ═══ */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{
+  font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--text3);padding:9px 15px;text-align:left;
+  border-bottom:1px solid var(--border);background:var(--surface2);white-space:nowrap;
+}
+.tbl td{
+  padding:10px 15px;border-bottom:1px solid var(--border);
+  font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);
+  transition:background .15s;
+}
+.tbl tr:hover td{background:var(--surface2)}
+.tbl tr:last-child td{border-bottom:none}
+
+/* Method badges */
+.badge{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
+.GET   {background:rgba(99,102,241,0.12);color:var(--accent);border:1px solid rgba(99,102,241,0.25)}
+.POST  {background:rgba(16,185,129,0.12);color:var(--green); border:1px solid rgba(16,185,129,0.25)}
+.PUT   {background:rgba(245,158,11,0.12);color:var(--amber); border:1px solid rgba(245,158,11,0.25)}
+.DELETE{background:rgba(239,68,68,0.12); color:var(--red);   border:1px solid rgba(239,68,68,0.25)}
+
+/* Health pills */
+.pill{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;display:inline-block}
+.p-ok  {background:rgba(16,185,129,0.1); color:var(--green);border:1px solid rgba(16,185,129,0.2)}
+.p-warn{background:rgba(245,158,11,0.1); color:var(--amber);border:1px solid rgba(245,158,11,0.2)}
+.p-crit{background:rgba(239,68,68,0.1);  color:var(--red);  border:1px solid rgba(239,68,68,0.2)}
+
+/* Latency bar */
+.lat{display:inline-flex;align-items:center;gap:6px}
+.lat-t{width:46px;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.lat-f{height:100%;border-radius:2px;transition:width .4s}
+
+/* ═══ SDIST ═══ */
+.sd-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.sd-row:last-child{border-bottom:none}
+.sd-l{display:flex;align-items:center;gap:9px}
+.sd-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.sd-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}
+.sd-r{text-align:right}
+.sd-n{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600}
+.sd-p{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)}
+
+/* ═══ TOP ROUTES ═══ */
+.tr-item{padding:9px 0;border-bottom:1px solid var(--border)}
+.tr-item:last-child{border-bottom:none}
+.tr-row{display:flex;justify-content:space-between;margin-bottom:5px}
+.tr-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.tr-n{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text)}
+.tr-track{height:2px;background:var(--surface3);border-radius:1px}
+.tr-fill{height:2px;background:var(--accent);border-radius:1px;opacity:.55;transition:width .5s ease}
+
+/* ═══ ALERTS ═══ */
+.al-row{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.al-row:last-child{border-bottom:none}
+.al-dot{width:7px;height:7px;border-radius:50%;margin-top:3px;flex-shrink:0}
+.al-msg{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);line-height:1.5}
+.al-t{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);margin-top:2px}
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes rowIn{from{opacity:0;background:rgba(99,102,241,0.06)}to{opacity:1;background:transparent}}
+.new-row td{animation:rowIn .5s ease}
+
+/* Number count-up effect */
+@keyframes countUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.kpi-val.updated{animation:countUp .3s ease}
+
+/* Pulse on new data */
+@keyframes borderPulse{0%,100%{border-color:var(--border)}50%{border-color:var(--accent)}}
+.card.pulse{animation:borderPulse .6s ease}
+
+/* ═══ SCROLLBAR ═══ */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* ═══ EMPTY ═══ */
+.empty{text-align:center;padding:32px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3)}
+
+/* ═══ TOP ERRORS ═══ */
+.err-item{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.err-item:last-child{border-bottom:none}
+.err-left{display:flex;align-items:center;gap:9px;min-width:0}
+.err-route{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}
+.err-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.err-code{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.err-cnt{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:var(--red)}
+
+/* ═══ UPTIME TICKER ═══ */
+.uptime-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
+.uptime-row:last-child{border-bottom:none}
+.uptime-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}
+.uptime-bar-wrap{display:flex;gap:2px;align-items:center}
+.uptime-seg{width:6px;height:16px;border-radius:2px;transition:background .3s}
+
+/* ═══ HEALTH SCORE CARD ═══ */
+.hscore-ring{position:relative;width:88px;height:88px;margin:0 auto 12px;flex-shrink:0}
+.hscore-svg{width:88px;height:88px;transform:rotate(-90deg)}
+.hscore-bg{fill:none;stroke:var(--surface3);stroke-width:7}
+.hscore-fill{fill:none;stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .8s cubic-bezier(.34,1.56,.64,1),stroke .4s}
+.hscore-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--text)}
+.hscore-label{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);text-align:center;margin-bottom:10px}
+.hscore-factors{display:flex;flex-direction:column;gap:7px}
+.hf-row{display:flex;align-items:center;justify-content:space-between}
+.hf-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2)}
+.hf-bar{flex:1;height:3px;background:var(--surface3);border-radius:2px;margin:0 10px;overflow:hidden}
+.hf-fill{height:100%;border-radius:2px;transition:width .6s ease}
+.hf-val{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;min-width:28px;text-align:right}
+
+/* ═══ EXTRA ANIMATIONS ═══ */
+
+/* Page load — cards cascade in */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes scaleIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+
+.kpi{animation:fadeUp .5s cubic-bezier(.34,1.56,.64,1) both}
+.kpi:nth-child(1){animation-delay:.04s}.kpi:nth-child(2){animation-delay:.09s}
+.kpi:nth-child(3){animation-delay:.14s}.kpi:nth-child(4){animation-delay:.19s}
+.kpi:nth-child(5){animation-delay:.24s}
+
+.card{animation:scaleIn .45s ease both;animation-delay:.2s}
+.row4 .card:nth-child(1){animation-delay:.22s}.row4 .card:nth-child(2){animation-delay:.28s}
+.row4 .card:nth-child(3){animation-delay:.34s}.row4 .card:nth-child(4){animation-delay:.40s}
+
+/* KPI number bounce on update */
+@keyframes numBounce{
+  0%  {transform:scale(1)}
+  30% {transform:scale(1.18);color:var(--accent2)}
+  60% {transform:scale(0.96)}
+  100%{transform:scale(1);color:var(--text)}
+}
+.kpi-val.updated{animation:numBounce .5s cubic-bezier(.34,1.56,.64,1)}
+
+/* Shimmer sweep on KPI hover */
+.kpi::after{
+  content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);
+  transition:none;pointer-events:none;
+}
+@keyframes shimmerSweep{0%{left:-100%}100%{left:160%}}
+.kpi:hover::after{animation:shimmerSweep .6s ease}
+
+/* Log rows — slide in from right with stagger */
+@keyframes rowSlide{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+.tbl tbody tr{animation:rowSlide .2s ease both}
+.tbl tbody tr:nth-child(1){animation-delay:.00s}.tbl tbody tr:nth-child(2){animation-delay:.03s}
+.tbl tbody tr:nth-child(3){animation-delay:.06s}.tbl tbody tr:nth-child(4){animation-delay:.09s}
+.tbl tbody tr:nth-child(5){animation-delay:.12s}.tbl tbody tr:nth-child(6){animation-delay:.15s}
+.tbl tbody tr:nth-child(7){animation-delay:.18s}.tbl tbody tr:nth-child(8){animation-delay:.21s}
+
+/* New log row highlight flash */
+@keyframes rowHighlight{0%{background:rgba(99,102,241,0.12)}100%{background:transparent}}
+.tbl tbody tr.new-row{animation:rowHighlight .8s ease}
+
+/* Bar chart — spring grow from bottom */
+@keyframes barGrow{
+  0%  {transform:scaleY(0);transform-origin:bottom;opacity:.4}
+  70% {transform:scaleY(1.04);transform-origin:bottom}
+  100%{transform:scaleY(1);transform-origin:bottom;opacity:1}
+}
+.bar{animation:barGrow .6s cubic-bezier(.34,1.56,.64,1) both}
+.bar:nth-child(odd){animation-delay:.02s}.bar:nth-child(even){animation-delay:.05s}
+
+/* Alert rows slide in */
+@keyframes alertIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.al-row{animation:alertIn .3s ease both}
+.al-row:nth-child(1){animation-delay:.05s}.al-row:nth-child(2){animation-delay:.10s}
+.al-row:nth-child(3){animation-delay:.15s}.al-row:nth-child(4){animation-delay:.20s}
+.al-row:nth-child(5){animation-delay:.25s}
+
+/* Err items drop in */
+@keyframes errIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+.err-item{animation:errIn .3s cubic-bezier(.34,1.56,.64,1) both}
+.err-item:nth-child(1){animation-delay:.03s}.err-item:nth-child(2){animation-delay:.08s}
+.err-item:nth-child(3){animation-delay:.13s}.err-item:nth-child(4){animation-delay:.18s}
+
+/* Live dot double-ring pulse */
+@keyframes livePing{
+  0%  {box-shadow:0 0 0 0 rgba(16,185,129,.7),0 0 0 0 rgba(16,185,129,.3)}
+  50% {box-shadow:0 0 0 8px rgba(16,185,129,0),0 0 0 14px rgba(16,185,129,0)}
+  100%{box-shadow:0 0 0 0 rgba(16,185,129,0),0 0 0 0 rgba(16,185,129,0)}
+}
+.live-ring{animation:livePing 2s ease-in-out infinite}
+
+/* Error card flash when new error */
+@keyframes errorFlash{
+  0%,100%{border-color:rgba(239,68,68,.5)}
+  25%    {border-color:rgba(239,68,68,1);box-shadow:0 0 24px rgba(239,68,68,.35)}
+  75%    {border-color:rgba(239,68,68,.8);box-shadow:0 0 16px rgba(239,68,68,.2)}
+}
+.kpi.k-o.flashing{animation:errorFlash .7s ease 4}
+
+/* Rate limited card pulse */
+@keyframes ratePulse{0%,100%{border-color:var(--border)}50%{border-color:rgba(239,68,68,.4)}}
+.kpi.k-r.alert{animation:ratePulse 1s ease 3}
+
+/* Smooth transitions on fill bars */
+.tr-fill{transition:width 1s cubic-bezier(.34,1.56,.64,1)}
+.hf-fill{transition:width 1.1s cubic-bezier(.34,1.56,.64,1)}
+.lat-f  {transition:width .5s ease}
+.hscore-fill{transition:stroke-dashoffset 1.2s cubic-bezier(.34,1.56,.64,1),stroke .5s ease}
+.sd-n{transition:color .4s ease}
+
+/* Top routes fill bars grow on render */
+@keyframes fillGrow{from{width:0}to{width:var(--w)}}
+
+/* Health score ring entrance */
+@keyframes ringEntrance{from{stroke-dashoffset:226;opacity:0}to{opacity:1}}
+#hs-ring{animation:ringEntrance .1s ease forwards}
+
+/* Logo pulse glow */
+@keyframes logoPulse{
+  0%,100%{box-shadow:0 0 0 1px rgba(99,102,241,.4),0 4px 14px rgba(99,102,241,.3)}
+  50%    {box-shadow:0 0 0 1px rgba(99,102,241,.7),0 4px 28px rgba(99,102,241,.55)}
+}
+
+/* Status bar separator pulse */
+.statusbar .sep{animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+/* Card hover lift */
+.card{transition:transform .2s ease,box-shadow .2s ease}
+.card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,0.12)}
+
+/* Privacy badge hover */
+.privacy-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);
+  border:1px solid var(--border);border-radius:6px;padding:3px 8px;
+  transition:all .25s;cursor:default;
+}
+.privacy-badge:hover{color:var(--green);border-color:rgba(16,185,129,.4);background:var(--glow-g);transform:scale(1.04)}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:1100px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr)}
+  .row4{grid-template-columns:1fr 1fr}
+}
+@media(max-width:768px){
+  .row2{grid-template-columns:1fr}
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .row4{grid-template-columns:1fr}
+}
+
+/* ═══ KEEP-ON-PAGE OVERLAY ═══ */
+#leave-modal{
+  display:none;position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;
+}
+#leave-modal.show{display:flex}
+.modal-box{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:18px;padding:36px 40px;max-width:420px;width:90%;
+  text-align:center;animation:slideUp .3s ease;
+  box-shadow:0 24px 60px rgba(0,0,0,0.4);
+}
+.modal-icon{font-size:40px;margin-bottom:16px}
+.modal-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:10px}
+.modal-desc{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:24px}
+.modal-btns{display:flex;gap:10px;justify-content:center}
+.modal-stay{
+  padding:10px 24px;border-radius:9px;border:none;
+  background:var(--accent);color:#fff;font-size:14px;font-weight:600;
+  cursor:pointer;transition:opacity .2s;
+}
+.modal-stay:hover{opacity:.85}
+.modal-leave{
+  padding:10px 24px;border-radius:9px;border:1px solid var(--border2);
+  background:transparent;color:var(--text2);font-size:14px;
+  cursor:pointer;transition:all .2s;
+}
+.modal-leave:hover{background:var(--surface3)}
+</style>
+</head>
+<body>
+
+<!-- ═══ LEAVE-PAGE MODAL ═══ -->
+<div id="leave-modal">
+  <div class="modal-box">
+    <div class="modal-icon">🛡</div>
+    <div class="modal-title">Leave NestShield?</div>
+    <div class="modal-desc">You're actively monitoring live API traffic. Leaving this page means you'll miss real-time alerts and anomaly detection.</div>
+    <div class="modal-btns">
+      <button class="modal-stay" onclick="stayOnPage()">Stay & Monitor</button>
+      <button class="modal-leave" id="leave-btn">Leave Anyway</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- ═══ TOPBAR ═══ -->
+<header class="topbar">
+  <a class="logo" href="#">
+    <div class="logo-mark">
+      <svg class="logo-svg" viewBox="0 0 24 24">
+        <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z"/>
+        <path d="M9 12l2 2 4-4" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <div class="name">NestShield</div>
+      <div class="tag">API Guard · Monitor</div>
+    </div>
+  </a>
+  <div class="nav-right">
+    <div class="live-pill"><div class="live-ring"></div>LIVE</div>
+    <div class="privacy-badge" title="Metrics are processed in-memory. No data sent to third parties.">🔒 NO DATA STORED</div>
+    <button class="theme-btn" onclick="toggleTheme()">
+      <span class="theme-icon" id="theme-icon">🌙</span>
+      <span id="theme-lbl">DARK</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══ STATUS BAR ═══ -->
+<div class="statusbar" id="sbar">
+  <span>◈ Connecting...</span>
+</div>
+
+<!-- ═══ KPI CARDS ═══ -->
+<div class="kpi-grid">
+  <div class="kpi k-a">
+    <div class="kpi-label">Total Requests</div>
+    <div class="kpi-val" id="st">—</div>
+    <div class="kpi-hint" id="st-h">&nbsp;</div>
+  </div>
+  <div class="kpi k-g">
+    <div class="kpi-label">Avg Latency</div>
+    <div class="kpi-val" id="sl">—<span class="u">ms</span></div>
+    <div class="kpi-hint">&nbsp;</div>
+  </div>
+  <div class="kpi k-o" id="err-kpi">
+    <div class="kpi-label">Error Rate</div>
+    <div class="kpi-val" id="se">—<span class="u">%</span></div>
+    <div class="kpi-hint" id="se-h">&nbsp;</div>
+  </div>
+  <div class="kpi k-r">
+    <div class="kpi-label">Rate Limited</div>
+    <div class="kpi-val" id="srl">—</div>
+    <div class="kpi-hint">&nbsp;</div>
+  </div>
+  <div class="kpi k-s">
+    <div class="kpi-label">Endpoints</div>
+    <div class="kpi-val" id="sr">—</div>
+    <div class="kpi-hint">&nbsp;</div>
+  </div>
+</div>
+
+<!-- ═══ ROW: CHART + LIVE LOG ═══ -->
+<div class="row2">
+  <!-- Left col: chart + top errors stacked -->
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div class="card" id="card-chart">
+      <div class="card-head">
+        <div class="card-title"><div class="cdot" style="background:var(--accent);box-shadow:0 0 5px var(--accent)"></div>Request Volume</div>
+        <div class="card-sub" id="chart-lbl">—</div>
+      </div>
+      <div class="chart-body">
+        <div class="bars" id="bars"></div>
+        <div class="blabels" id="blabels"></div>
+      </div>
+    </div>
+    <!-- Top Errors card — fills the dead space -->
+    <div class="card" id="card-errors">
+      <div class="card-head">
+        <div class="card-title"><div class="cdot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>Top Failing Endpoints</div>
+        <div class="card-sub" id="err-cnt">live</div>
+      </div>
+      <div style="padding:12px 18px" id="top-errors">
+        <div class="empty">No errors detected ✓</div>
+      </div>
+    </div>
+    <!-- Top Routes — fills remaining space below failing card -->
+    <div class="card" id="card-top-routes">
+      <div class="card-head">
+        <div class="card-title"><div class="cdot" style="background:var(--purple);box-shadow:0 0 5px var(--purple)"></div>Top Routes by Traffic</div>
+        <div class="card-sub">by request count</div>
+      </div>
+      <div style="padding:12px 18px" id="top-routes-inline">
+        <div class="empty">Waiting for traffic…</div>
+      </div>
+    </div>
+  </div>
+  <!-- Right col: live log -->
+  <div class="card" id="card-log">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>Live Log</div>
+      <div class="card-sub">real-time stream</div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Method</th><th>Route</th><th>Status</th><th>ms</th><th>Time</th></tr></thead>
+      <tbody id="log"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ ALL ENDPOINTS ═══ -->
+<div class="card" style="margin-bottom:14px" id="card-ep">
+  <div class="card-head">
+    <div class="card-title"><div class="cdot" style="background:var(--amber);box-shadow:0 0 5px var(--amber)"></div>All Endpoints</div>
+    <div class="card-sub" id="ep-cnt"></div>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr><th>Method</th><th>Route</th><th>Requests</th><th>Avg</th><th>p95</th><th>p99</th><th>Errors</th><th>Error %</th><th>Last</th><th>Health</th></tr></thead>
+      <tbody id="routes"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ BOTTOM ROW ═══ -->
+<div class="row4">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--sky);box-shadow:0 0 5px var(--sky)"></div>Status Codes</div>
+    </div>
+    <div style="padding:14px 18px" id="sdist"></div>
+  </div>
+
+  <!-- Health Score — new high-impact card -->
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--green);box-shadow:0 0 5px var(--green)"></div>API Health Score</div>
+      <div class="card-sub" id="hs-label">calculating…</div>
+    </div>
+    <div style="padding:16px 18px">
+      <div class="hscore-ring">
+        <svg class="hscore-svg" viewBox="0 0 88 88">
+          <circle class="hscore-bg" cx="44" cy="44" r="36"/>
+          <circle class="hscore-fill" id="hs-ring" cx="44" cy="44" r="36"
+            stroke-dasharray="226" stroke-dashoffset="226"/>
+        </svg>
+        <div class="hscore-num" id="hs-num">—</div>
+      </div>
+      <div class="hscore-factors" id="hs-factors"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--amber);box-shadow:0 0 5px var(--amber)"></div>Alerts</div>
+      <div class="card-sub" id="al-cnt"></div>
+    </div>
+    <div style="padding:14px 18px" id="alerts"></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <div class="card-title"><div class="cdot" style="background:var(--red);box-shadow:0 0 5px var(--red)"></div>Blocked IPs</div>
+      <div class="card-sub" id="bl-cnt"></div>
+    </div>
+    <div style="overflow-x:auto;width:100%">
+      <table class="tbl" style="min-width:340px">
+        <thead><tr><th>IP</th><th>Hits</th><th>Last Seen</th><th>Status</th></tr></thead>
+        <tbody id="bl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+/* ═══ THEME ═══ */
+const saved = localStorage.getItem('ns-theme') || 'dark';
+setTheme(saved);
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('theme-icon').textContent = t === 'dark' ? '🌙' : '☀️';
+  document.getElementById('theme-lbl').textContent  = t === 'dark' ? 'DARK' : 'LIGHT';
+  localStorage.setItem('ns-theme', t);
+}
+function toggleTheme() {
+  setTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+
+/* ═══ LEAVE-PAGE GUARD — custom modal only, no browser reload prompt ═══ */
+let leaveHref = null;
+
+// Only intercept actual navigation link clicks — NOT refresh/F5
+document.addEventListener('click', e => {
+  const a = e.target.closest('a');
+  if (a && a.href && !a.href.startsWith('#') && !a.href.startsWith('javascript') && a.href !== window.location.href) {
+    e.preventDefault();
+    leaveHref = a.href;
+    document.getElementById('leave-modal').classList.add('show');
+  }
+});
+
+document.getElementById('leave-btn').addEventListener('click', () => {
+  window.removeEventListener('beforeunload', () => {});
+  if (leaveHref) window.location.href = leaveHref;
+  else window.history.back();
+});
+
+function stayOnPage() {
+  document.getElementById('leave-modal').classList.remove('show');
+  leaveHref = null;
+}
+
+/* ═══ SOCKET + DATA ═══ */
+const socket = io();
+
+// On connect — fetch once from server to populate initial state
+socket.on('connect', () => {
+  fetch('/nestshield/stats').then(r=>r.json()).then(render).catch(()=>{});
+});
+
+socket.on('disconnect', () => {
+  document.getElementById('sbar').innerHTML =
+    '<span style="color:var(--amber)">⟳ Reconnecting to server...</span>';
+});
+
+// Every new request pushes full stats via WebSocket — render directly, no HTTP needed
+socket.on('metrics-update', (data) => {
+  if (data && data.summary) render(data);
+});
+
+// Fallback poll every 60s ONLY if socket isn't delivering (safety net)
+setInterval(() => {
+  if (!socket.connected) {
+    fetch('/nestshield/stats').then(r=>r.json()).then(render).catch(()=>{});
+  }
+}, 60000);
+
+/* ═══ HELPERS ═══ */
+const fmt = n => Number(n).toLocaleString();
+const sc  = code => code >= 500 ? 'var(--red)' : code >= 400 ? 'var(--amber)' : 'var(--green)';
+
+let prevTotal = 0;
+
+/* ═══ RENDER ═══ */
+function render(d) {
+  if (!d?.summary) return;
+
+  // Status bar
+  document.getElementById('sbar').innerHTML =
+    '<span class="hi">◈ real-time</span>' +
+    '<span class="sep">·</span><span>'+fmt(d.summary.totalRequests)+' requests tracked</span>' +
+    '<span class="sep">·</span><span>WebSocket live</span>' +
+    '<span class="sep">·</span><span>'+new Date().toLocaleTimeString()+'</span>';
+
+  // KPI — update text and animate on change
+  const setKPI = (id, val) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const str = String(val);
+    if (el.dataset.v !== str) {
+      el.dataset.v = str;
+      el.textContent = str;
+      el.classList.remove('updated');
+      void el.offsetWidth;
+      el.classList.add('updated');
+    }
+  };
+
+  setKPI('st',  fmt(d.summary.totalRequests));
+  document.getElementById('sl').innerHTML  = d.summary.avgLatency + '<span class="u">ms</span>';
+  document.getElementById('se').innerHTML  = d.summary.errorRate  + '<span class="u">%</span>';
+  setKPI('srl', fmt(d.summary.rateLimited ?? 0));
+  setKPI('sr',  d.routes.length);
+  document.getElementById('ep-cnt').textContent = d.routes.length + ' tracked';
+
+  // Error card highlight + flash animation on new errors
+  const er = parseFloat(d.summary.errorRate);
+  const ek = document.getElementById('err-kpi');
+  const prevEr = parseFloat(ek.dataset.er || '0');
+  ek.dataset.er = String(er);
+  ek.style.borderColor = er > 5 ? 'rgba(239,68,68,0.5)' : er > 1 ? 'rgba(245,158,11,0.4)' : 'var(--border)';
+  if (er > prevEr && er > 1) {
+    ek.classList.remove('flashing');
+    void ek.offsetWidth;
+    ek.classList.add('flashing');
+  }
+  const eh = document.getElementById('se-h');
+  eh.textContent = er > 5 ? '⚠ above threshold' : er > 1 ? '↑ elevated' : '✓ nominal';
+  eh.style.color  = er > 5 ? 'var(--red)' : er > 1 ? 'var(--amber)' : 'var(--green)';
+
+  // New requests indicator
+  const curr = d.summary.totalRequests;
+  if (prevTotal > 0 && curr > prevTotal) {
+    document.getElementById('st-h').textContent = '+' + (curr - prevTotal) + ' since last update';
+    document.getElementById('st-h').style.color = 'var(--green)';
+  }
+  prevTotal = curr;
+
+  // Chart
+  const mxH = Math.max(...d.hourly.map(h => h.count), 1);
+  document.getElementById('bars').innerHTML = d.hourly.map(h => {
+    const pct = Math.max(Math.round(h.count / mxH * 100), 2);
+    const intensity = 0.08 + (pct / 100) * 0.35;
+    return '<div class="bar" style="height:'+pct+'%;background:rgba(99,102,241,'+intensity+')">' +
+           '<div class="bar-tooltip">'+h.count+' req</div></div>';
+  }).join('');
+  document.getElementById('blabels').innerHTML = d.hourly.map(h =>
+    '<span class="blabel">'+(h.label||h.hour+':00')+'</span>'
+  ).join('');
+  document.getElementById('chart-lbl').textContent = 'last 60 min';
+
+  // Live log
+  document.getElementById('log').innerHTML = (d.recent||[]).slice(0,13).map(e => {
+    const color = sc(e.statusCode);
+    const ms    = e.duration > 500 ? 'var(--red)' : e.duration > 200 ? 'var(--amber)' : 'var(--text3)';
+    const t     = new Date(e.timestamp||Date.now()).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return '<tr>'+
+      '<td><span class="badge '+e.method+'">'+e.method+'</span></td>'+
+      '<td style="color:var(--text3);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.route+'</td>'+
+      '<td style="color:'+color+'">'+e.statusCode+'</td>'+
+      '<td style="color:'+ms+'">'+e.duration+'</td>'+
+      '<td style="font-size:10px;color:var(--text3)">'+t+'</td>'+
+    '</tr>';
+  }).join('')||'<tr><td colspan="5" class="empty">Waiting for requests…</td></tr>';
+
+  // Routes table
+  const mxP = Math.max(...d.routes.map(r => r.p95Ms), 1);
+  document.getElementById('routes').innerHTML = d.routes.length === 0
+    ? '<tr><td colspan="10" class="empty">No requests in this time range</td></tr>'
+    : d.routes.map(r => {
+        const pct = Math.min(Math.round(r.p95Ms / mxP * 100), 100);
+        const lc  = r.p95Ms > 500 ? 'var(--red)' : r.p95Ms > 200 ? 'var(--amber)' : 'var(--accent)';
+        const ep  = r.count > 0 ? ((r.errorCount/r.count)*100).toFixed(1) : '0.0';
+        const epc = parseFloat(ep) > 5 ? 'var(--red)' : parseFloat(ep) > 0 ? 'var(--amber)' : 'var(--text3)';
+        const hp  = r.errorCount > 10 || r.p95Ms > 1000
+          ? '<span class="pill p-crit">critical</span>'
+          : r.errorCount > 0 || r.p95Ms > 300
+          ? '<span class="pill p-warn">degraded</span>'
+          : '<span class="pill p-ok">healthy</span>';
+        return '<tr>'+
+          '<td><span class="badge '+r.method+'">'+r.method+'</span></td>'+
+          '<td style="color:var(--text)">'+r.route+'</td>'+
+          '<td>'+fmt(r.count)+'</td>'+
+          '<td style="color:'+(r.avgMs>300?'var(--amber)':'var(--text2)')+'">'+r.avgMs+'ms</td>'+
+          '<td><div class="lat"><span style="color:'+lc+'">'+r.p95Ms+'ms</span>'+
+            '<div class="lat-t"><div class="lat-f" style="width:'+pct+'%;background:'+lc+'"></div></div></div></td>'+
+          '<td style="color:var(--text3)">'+r.p99Ms+'ms</td>'+
+          '<td style="color:'+(r.errorCount>0?'var(--red)':'var(--text3)')+'">'+r.errorCount+'</td>'+
+          '<td style="color:'+epc+'">'+ep+'%</td>'+
+          '<td style="color:'+sc(r.lastStatus)+'">'+r.lastStatus+'</td>'+
+          '<td>'+hp+'</td>'+
+        '</tr>';
+      }).join('');
+
+  // Status distribution
+  const c={s2:0,s3:0,s4:0,s5:0};
+  (d.recent||[]).forEach(e=>{
+    if(e.statusCode<300)c.s2++;
+    else if(e.statusCode<400)c.s3++;
+    else if(e.statusCode<500)c.s4++;
+    else c.s5++;
+  });
+  const tot=(d.recent||[]).length||1;
+  const sdistEl = document.getElementById('sdist');
+  if (sdistEl) sdistEl.innerHTML=[
+    ['2xx Success',c.s2,'var(--green)'],
+    ['3xx Redirect',c.s3,'var(--sky)'],
+    ['4xx Client', c.s4,'var(--amber)'],
+    ['5xx Server', c.s5,'var(--red)'],
+  ].map(([n,v,col])=>{
+    const p=Math.round(v/tot*100);
+    return '<div class="sd-row">'+
+      '<div class="sd-l"><div class="sd-dot" style="background:'+col+';box-shadow:0 0 5px '+col+'"></div>'+
+      '<span class="sd-name">'+n+'</span></div>'+
+      '<div class="sd-r"><div class="sd-n" style="color:'+col+'">'+v+'</div>'+
+      '<div class="sd-p">'+p+'%</div></div></div>';
+  }).join('');
+
+  // Top failing endpoints
+  const failingRoutes = d.routes
+    .filter(r => r.errorCount > 0)
+    .sort((a,b) => b.errorCount - a.errorCount)
+    .slice(0, 6);
+  const errCnt = document.getElementById('err-cnt');
+  if (errCnt) errCnt.textContent = failingRoutes.length > 0 ? failingRoutes.length+' failing' : 'all clear';
+  const topErrorsEl = document.getElementById('top-errors');
+  if (topErrorsEl) topErrorsEl.innerHTML = failingRoutes.length === 0
+    ? '<div class="empty" style="padding:14px">No errors — all endpoints healthy ✓</div>'
+    : failingRoutes.map(r => {
+        const is5xx = r.lastStatus >= 500;
+        const s = is5xx
+          ? 'background:rgba(239,68,68,0.12);color:var(--red);border:1px solid rgba(239,68,68,0.25)'
+          : 'background:rgba(245,158,11,0.12);color:var(--amber);border:1px solid rgba(245,158,11,0.25)';
+        const ep2 = r.count > 0 ? ((r.errorCount/r.count)*100).toFixed(0) : '0';
+        return '<div class="err-item">'+
+          '<div class="err-left">'+
+          '<span class="badge '+r.method+'">'+r.method+'</span>'+
+          '<span class="err-route" title="'+r.route+'">'+r.route+'</span>'+
+          '</div><div class="err-right">'+
+          '<span class="err-code" style="'+s+'">'+r.lastStatus+'</span>'+
+          '<span class="err-cnt">'+r.errorCount+' err · '+ep2+'%</span>'+
+          '</div></div>';
+      }).join('');
+
+  // Top routes inline (below failing card)
+  const trInline = document.getElementById('top-routes-inline');
+  if (trInline) {
+    const mxC2 = Math.max(...d.routes.map(r=>r.count), 1);
+    trInline.innerHTML = d.routes.slice(0,6).map(r => {
+      const p = Math.round(r.count/mxC2*100);
+      return '<div class="tr-item">'+
+        '<div class="tr-row"><span class="tr-name">'+r.route+'</span>'+
+        '<span class="tr-n">'+fmt(r.count)+'</span></div>'+
+        '<div class="tr-track"><div class="tr-fill" style="width:'+p+'%"></div></div></div>';
+    }).join('') || '<div class="empty" style="padding:12px">Waiting for traffic…</div>';
+  }
+
+  // ── API Health Score ──────────────────────────────────────────────────────
+  const errRateNum = parseFloat(d.summary.errorRate) || 0;
+  const latencyNum = d.summary.avgLatency || 0;
+  const totalReqs  = d.summary.totalRequests || 0;
+
+  const ring   = document.getElementById('hs-ring');
+  const hsNum  = document.getElementById('hs-num');
+  const hsLbl  = document.getElementById('hs-label');
+  const hsFact = document.getElementById('hs-factors');
+
+  if (totalReqs === 0) {
+    // No data yet — show neutral empty state
+    if (ring)   { ring.style.strokeDashoffset = '226'; ring.style.stroke = 'var(--border2)'; }
+    if (hsNum)  { hsNum.textContent = '—'; hsNum.style.color = 'var(--text3)'; }
+    if (hsLbl)  { hsLbl.textContent = 'No data yet'; hsLbl.style.color = 'var(--text3)'; }
+    if (hsFact) hsFact.innerHTML = '<div class="empty" style="padding:10px;font-size:10px">Waiting for first request…</div>';
+  } else {
+    const errScore   = Math.max(0, Math.min(100, 100 - (errRateNum * 8)));
+    const latScore   = Math.max(0, Math.min(100, 100 - (latencyNum / 10)));
+    const availScore = 100; // we have requests so service is available
+    const score      = Math.round(errScore * 0.4 + latScore * 0.3 + availScore * 0.3);
+    const scoreColor = score >= 90 ? 'var(--green)' : score >= 70 ? 'var(--amber)' : 'var(--red)';
+    const scoreLabel = score >= 90 ? 'Excellent' : score >= 70 ? 'Degraded' : 'Critical';
+    const offset2    = 226 - (score / 100) * 226;
+
+    if (ring)  { ring.style.strokeDashoffset = offset2; ring.style.stroke = scoreColor; }
+    if (hsNum) { hsNum.textContent = score; hsNum.style.color = scoreColor; }
+    if (hsLbl) { hsLbl.textContent = scoreLabel; hsLbl.style.color = scoreColor; }
+    if (hsFact) hsFact.innerHTML = [
+      ['Error Rate',   errScore],
+      ['Latency',      latScore],
+      ['Availability', availScore],
+    ].map(([n,v])=>{
+      const c = v >= 90 ? 'var(--green)' : v >= 60 ? 'var(--amber)' : 'var(--red)';
+      return '<div class="hf-row">'+
+        '<span class="hf-name">'+n+'</span>'+
+        '<div class="hf-bar"><div class="hf-fill" style="width:'+Math.round(v)+'%;background:'+c+'"></div></div>'+
+        '<span class="hf-val" style="color:'+c+'">'+Math.round(v)+'</span></div>';
+    }).join('');
+  }
+
+  // Alerts — show exact API names and all error types
+  const al=[];
+  d.routes.forEach(r=>{
+    if (r.errorCount > 0) {
+      const ep3 = r.count > 0 ? ((r.errorCount/r.count)*100).toFixed(1) : '0';
+      const base = r.method+' <b>'+r.route+'</b>';
+      if (parseFloat(ep3) > 10) al.push({c:'var(--red)',   m: base+' — '+r.errorCount+' errors ('+ep3+'%)'});
+      else if (parseFloat(ep3) > 0) al.push({c:'var(--amber)', m: base+' — '+r.errorCount+' errors ('+ep3+'%)'});
+    }
+    if (r.p95Ms > 1000) al.push({c:'var(--amber)', m: r.method+' <b>'+r.route+'</b> — p95 '+r.p95Ms+'ms (slow)'});
+  });
+  if (errRateNum > 5)  al.unshift({c:'var(--red)',   m:'Error rate <b>'+d.summary.errorRate+'%</b> — threshold is 5%'});
+  if (latencyNum > 500) al.unshift({c:'var(--amber)', m:'Avg latency <b>'+latencyNum+'ms</b> — threshold is 500ms'});
+  if ((d.summary.rateLimited||0) > 0) al.push({c:'var(--amber)', m:'<b>'+d.summary.rateLimited+'</b> requests rate-limited (429)'});
+  if (al.length === 0) al.push({c:'var(--green)', m:'✓ All systems healthy — no active issues'});
+  document.getElementById('al-cnt').textContent = al.filter(a=>a.c!=='var(--green)').length+' active';
+  document.getElementById('alerts').innerHTML = al.slice(0,6).map(a=>
+    '<div class="al-row">'+
+    '<div class="al-dot" style="background:'+a.c+';box-shadow:0 0 5px '+a.c+'"></div>'+
+    '<div><div class="al-msg">'+a.m+'</div>'+
+    '<div class="al-t">just now</div></div></div>'
+  ).join('');
+
+  // Blocked IPs
+  const bl=d.blockedIPs||[];
+  document.getElementById('bl-cnt').textContent=bl.length+' IPs';
+  document.getElementById('bl-body').innerHTML=bl.length===0
+    ?'<tr><td colspan="4" class="empty">No IPs blocked ✓</td></tr>'
+    :bl.map(b=>'<tr>'+
+      '<td style="color:var(--red);white-space:nowrap">'+b.ip+'</td>'+
+      '<td style="color:var(--red)">'+b.hits+'</td>'+
+      '<td style="white-space:nowrap">'+new Date(b.lastSeen).toLocaleTimeString()+'</td>'+
+      '<td style="white-space:nowrap"><span class="pill p-crit">blocked</span></td>'+
+    '</tr>').join('');
+}
+</script>
+</body>
+</html>`

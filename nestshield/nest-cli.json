@@ -3,7 +3,11 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true,
-    "assets": ["**/*.html"]
+    "assets": [
+      {
+        "include": "dashboard/nestshield-dashboard.html",
+        "watchAssets": true
+      }
+    ]
   }
 }
