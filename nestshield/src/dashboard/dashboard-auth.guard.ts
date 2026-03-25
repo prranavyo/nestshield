@@ -1,4 +1,4 @@
-import { CanActivate,ExecutionContext,Injectable} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { DashboardAuthService } from './dashboard-auth.service';
 
@@ -11,10 +11,13 @@ export class DashboardAuthGuard implements CanActivate {
     const res: Response = context.switchToHttp().getResponse();
     const route: string = req.path || req.url || '';
 
-    // Login route — always open, no token needed
+    // ── Only intercept /nestshield/* routes — leave all other app routes alone
+    if (!route.startsWith('/nestshield')) return true;
+
+    // ── Login route — always open, no token needed
     if (route === '/nestshield/auth/login') return true;
 
-    // All other /nestshield/* routes — require valid token
+    // ── All other /nestshield/* routes — require valid token
     const token = this.extractToken(req);
 
     if (!token) {
@@ -34,8 +37,8 @@ export class DashboardAuthGuard implements CanActivate {
     return true;
   }
 
-  // ── Cookie extraction ────────────────────────────────────────────────────────
-  // Reads the HttpOnly cookie.  Falls back to parsing Cookie header manually
+  // ── Cookie extraction ─────────────────────────────────────────────────────
+  // Reads the HttpOnly cookie. Falls back to parsing Cookie header manually
   // in case cookie-parser middleware is not registered in the host app.
   private extractToken(req: Request): string | null {
     // Via cookie-parser middleware (preferred)

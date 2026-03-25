@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { metricsStore } from '../core/metrics.store';
-import { blockedIPsStore } from '../guards/nestshield.guard';
+import { blockedIPsStore } from '../guards/nestshield-throttle.guard';
 import { NestShieldOptions } from '../nestshield.module';
 
 // ─────────────────────────────────────────────────────────────────────────────

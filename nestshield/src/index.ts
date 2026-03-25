@@ -12,5 +12,5 @@ export {
   NestShieldGuard,
   blockedIPsStore,
   totalRateLimited,
-}                                   from './guards/nestshield.guard';
+}                                   from './guards/nestshield-throttle.guard';
 export { metricsStore }             from './core/metrics.store';
