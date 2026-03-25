@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { metricsStore } from './metrics.store';
-import { blockedIPsStore, totalRateLimited } from '../guards/nestshield.guard';
+import { blockedIPsStore, totalRateLimited } from '../guards/nestshield-throttle.guard';
 
 @Injectable()
 export class MetricsService {

@@ -4,7 +4,7 @@ import { ThrottlerModule }               from '@nestjs/throttler';
 import { MetricsGateway }                from './core/metrics.gateway';
 import { MetricsService }                from './core/metrics.service';
 import { MetricsInterceptor }            from './core/metrics.interceptor';
-import { NestShieldGuard }               from './guards/nestshield.guard';
+import { NestShieldGuard }               from './guards/nestshield-throttle.guard';
 import { AlertService }                  from './alerts/alert.service';
 import { NestShieldController }          from './dashboard/nestshield.controller';
 import { DashboardAuthService }          from './dashboard/dashboard-auth.service';
@@ -84,8 +84,13 @@ export class NestShieldModule {
           ),
         },
 
-        // DashboardAuthGuard — protects /nestshield/* routes
-        DashboardAuthGuard,
+        // ✅ FIX: Use APP_GUARD so NestJS DI properly injects DashboardAuthService
+        //         into the guard. Plain provider + @UseGuards() on controller does
+        //         NOT guarantee DI injection in a dynamic/global module context.
+        {
+          provide  : APP_GUARD,
+          useClass : DashboardAuthGuard,
+        },
 
         // Global interceptor + throttle guard
         { provide: APP_INTERCEPTOR, useClass: MetricsInterceptor },

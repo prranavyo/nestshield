@@ -5,7 +5,6 @@ import {
   Res,
   Query,
   Body,
-  UseGuards,
   HttpCode,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -14,10 +13,14 @@ import * as path from 'path';
 import { MetricsService }       from '../core/metrics.service';
 import { AlertService }         from '../alerts/alert.service';
 import { DashboardAuthService } from './dashboard-auth.service';
-import { DashboardAuthGuard }   from './dashboard-auth.guard';
 
-@Controller()
-@UseGuards(DashboardAuthGuard)
+// ✅ FIX: Removed @UseGuards(DashboardAuthGuard) — guard is now registered as
+//         APP_GUARD in nestshield.module.ts which ensures proper DI resolution.
+//         Keeping @UseGuards here caused DashboardAuthService to be undefined
+//         inside the guard (NestJS couldn't resolve DI for a plain provider
+//         used via decorator in a dynamic global module).
+
+@Controller('/nestshield')
 export class NestShieldController {
   constructor(
     private readonly metricsService : MetricsService,
@@ -26,14 +29,14 @@ export class NestShieldController {
   ) {}
 
   // ── Login page GET — guard always allows this route ─────────────────────────
-  @Get('nestshield/auth/login')
+  @Get('/auth/login')
   getLoginPage(@Res() res: Response) {
     res.setHeader('Content-Type', 'text/html');
     res.send(this.getLoginHtml());
   }
 
   // ── Login submit POST ────────────────────────────────────────────────────────
-  @Post('nestshield/auth/login')
+  @Post('/auth/login')
   @HttpCode(200)
   postLogin(
     @Body() body: { secret?: string },
@@ -62,26 +65,26 @@ export class NestShieldController {
   }
 
   // ── Logout ───────────────────────────────────────────────────────────────────
-  @Get('nestshield/auth/logout')
+  @Get('/auth/logout')
   logout(@Res() res: Response) {
     res.clearCookie('ns_token');
     return res.redirect('/nestshield/auth/login');
   }
 
   // ── Stats API ────────────────────────────────────────────────────────────────
-  @Get('nestshield/stats')
+  @Get('/stats')
   async getStats(@Query('hours') hours?: string) {
     return this.metricsService.getStats(parseInt(hours || '1'));
   }
 
   // ── Summary ──────────────────────────────────────────────────────────────────
-  @Get('nestshield')
+  @Get('')
   async getDashboard() {
     return (await this.metricsService.getStats()).summary;
   }
 
   // ── Dashboard UI ─────────────────────────────────────────────────────────────
-  @Get('nestshield/ui')
+  @Get('/ui')
   getDashboardUI(@Res() res: Response) {
     const filePath = path.join(__dirname, 'nestshield-dashboard.html');
     if (fs.existsSync(filePath)) {
